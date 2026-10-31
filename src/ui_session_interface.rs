@@ -698,6 +698,10 @@ impl<T: InvokeUiSession> Session<T> {
 
     pub fn swap_modifier_key(&self, msg: &mut KeyEvent) {
         let allow_swap_key = self.get_toggle_option("allow_swap_key".to_string());
+        if !allow_swap_key && self.get_toggle_option("map_command_to_ctrl".to_string()) {
+            self.map_command_to_ctrl_key(msg);
+            return;
+        }
         if allow_swap_key {
             if let Some(key_event::Union::ControlKey(ck)) = msg.union {
                 let ck = ck.enum_value_or_default();
@@ -760,6 +764,61 @@ impl<T: InvokeUiSession> Session<T> {
                             rdev::Key::ControlLeft => rdev::Key::MetaLeft,
                             rdev::Key::MetaLeft => rdev::Key::ControlLeft,
                             rdev::Key::ControlRight => rdev::Key::MetaLeft,
+                            rdev::Key::MetaRight => rdev::Key::ControlLeft,
+                            _ => key,
+                        };
+                        rdev::linux_keycode_from_key(key).unwrap_or_default()
+                    }
+                };
+                msg.set_chr(key);
+            }
+        }
+    }
+
+    fn map_command_to_ctrl_key(&self, msg: &mut KeyEvent) {
+        let map = |ck: ControlKey| match ck {
+            ControlKey::Meta => ControlKey::Control,
+            ControlKey::RWin => ControlKey::Control,
+            _ => ck,
+        };
+        if let Some(key_event::Union::ControlKey(ck)) = msg.union {
+            msg.set_control_key(map(ck.enum_value_or_default()));
+        }
+        msg.modifiers = msg
+            .modifiers
+            .iter()
+            .map(|ck| hbb_common::protobuf::EnumOrUnknown::new(map(ck.enum_value_or_default())))
+            .collect();
+
+        // In legacy mode chr is a character, not a peer key code.
+        if msg.mode.enum_value_or(KeyboardMode::Legacy) != KeyboardMode::Legacy {
+            let code = msg.chr();
+            if code != 0 {
+                let mut peer = self.peer_platform().to_lowercase();
+                peer.retain(|c| !c.is_whitespace());
+                let key = match peer.as_str() {
+                    "windows" => {
+                        let key = rdev::win_key_from_scancode(code);
+                        let key = match key {
+                            rdev::Key::MetaLeft => rdev::Key::ControlLeft,
+                            rdev::Key::MetaRight => rdev::Key::ControlLeft,
+                            _ => key,
+                        };
+                        rdev::win_scancode_from_key(key).unwrap_or_default()
+                    }
+                    "macos" => {
+                        let key = rdev::macos_key_from_code(code as _);
+                        let key = match key {
+                            rdev::Key::MetaLeft => rdev::Key::ControlLeft,
+                            rdev::Key::MetaRight => rdev::Key::ControlLeft,
+                            _ => key,
+                        };
+                        rdev::macos_keycode_from_key(key).unwrap_or_default() as _
+                    }
+                    _ => {
+                        let key = rdev::linux_key_from_code(code);
+                        let key = match key {
+                            rdev::Key::MetaLeft => rdev::Key::ControlLeft,
                             rdev::Key::MetaRight => rdev::Key::ControlLeft,
                             _ => key,
                         };
@@ -1939,6 +1998,22 @@ impl<T: InvokeUiSession> Interface for Session<T> {
 
     fn swap_modifier_mouse(&self, msg: &mut base::protos::message::MouseEvent) {
         let allow_swap_key = self.get_toggle_option("allow_swap_key".to_string());
+        if !allow_swap_key && self.get_toggle_option("map_command_to_ctrl".to_string()) {
+            msg.modifiers = msg
+                .modifiers
+                .iter()
+                .map(|ck| {
+                    let ck = ck.enum_value_or_default();
+                    let ck = match ck {
+                        ControlKey::Meta => ControlKey::Control,
+                        ControlKey::RWin => ControlKey::Control,
+                        _ => ck,
+                    };
+                    hbb_common::protobuf::EnumOrUnknown::new(ck)
+                })
+                .collect();
+            return;
+        }
         if allow_swap_key {
             msg.modifiers = msg
                 .modifiers

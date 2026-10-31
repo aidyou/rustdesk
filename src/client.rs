@@ -3277,6 +3277,18 @@ impl LoginConfigHandler {
             config.show_quality_monitor.v = !config.show_quality_monitor.v;
         } else if name == "allow_swap_key" {
             config.allow_swap_key.v = !config.allow_swap_key.v;
+            if config.allow_swap_key.v {
+                config.options.remove("map_command_to_ctrl");
+            }
+        } else if name == "map_command_to_ctrl" {
+            if self.get_option(&name).is_empty() {
+                config.options.insert(name, "Y".to_owned());
+                config.allow_swap_key.v = false;
+            } else {
+                config.options.remove(&name);
+            }
+            self.save_config(config);
+            return None;
         } else if name == "view-only" {
             config.view_only.v = !config.view_only.v;
             let f = |b: bool| {

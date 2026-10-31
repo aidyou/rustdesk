@@ -1347,6 +1347,20 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
         actionId: kShortcutActionToggleSwapCtrlCmd,
         onChanged: enabled ? onChanged : null,
         child: Text(translate('Swap control-command key'))));
+
+    // The two mappings are mutually exclusive; enabling one clears the other.
+    final mapCmdOption = 'map_command_to_ctrl';
+    final mapCmdValue = bind.sessionGetToggleOptionSync(
+        sessionId: sessionId, arg: mapCmdOption);
+    onMapCmdChanged(bool? value) {
+      if (value == null) return;
+      bind.sessionToggleOption(sessionId: sessionId, value: mapCmdOption);
+    }
+
+    v.add(TToggleMenu(
+        value: mapCmdValue,
+        onChanged: enabled ? onMapCmdChanged : null,
+        child: Text(translate('Map command to Ctrl'))));
   }
 
   // Relative mouse mode (gaming mode).
