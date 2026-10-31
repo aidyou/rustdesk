@@ -776,6 +776,11 @@ impl<T: InvokeUiSession> Session<T> {
     }
 
     fn map_command_to_ctrl_key(&self, msg: &mut KeyEvent) {
+        // Only a macOS client has a Command key to turn into Ctrl. On other
+        // clients Meta/Super already reaches a macOS peer as Command.
+        if !cfg!(target_os = "macos") {
+            return;
+        }
         let map = |ck: ControlKey| match ck {
             ControlKey::Meta => ControlKey::Control,
             ControlKey::RWin => ControlKey::Control,
@@ -1999,19 +2004,21 @@ impl<T: InvokeUiSession> Interface for Session<T> {
     fn swap_modifier_mouse(&self, msg: &mut base::protos::message::MouseEvent) {
         let allow_swap_key = self.get_toggle_option("allow_swap_key".to_string());
         if !allow_swap_key && self.get_toggle_option("map_command_to_ctrl".to_string()) {
-            msg.modifiers = msg
-                .modifiers
-                .iter()
-                .map(|ck| {
-                    let ck = ck.enum_value_or_default();
-                    let ck = match ck {
-                        ControlKey::Meta => ControlKey::Control,
-                        ControlKey::RWin => ControlKey::Control,
-                        _ => ck,
-                    };
-                    hbb_common::protobuf::EnumOrUnknown::new(ck)
-                })
-                .collect();
+            if cfg!(target_os = "macos") {
+                msg.modifiers = msg
+                    .modifiers
+                    .iter()
+                    .map(|ck| {
+                        let ck = ck.enum_value_or_default();
+                        let ck = match ck {
+                            ControlKey::Meta => ControlKey::Control,
+                            ControlKey::RWin => ControlKey::Control,
+                            _ => ck,
+                        };
+                        hbb_common::protobuf::EnumOrUnknown::new(ck)
+                    })
+                    .collect();
+            }
             return;
         }
         if allow_swap_key {

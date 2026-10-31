@@ -1347,19 +1347,22 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
         actionId: kShortcutActionToggleSwapCtrlCmd,
         onChanged: enabled ? onChanged : null,
         child: Text(translate('Swap control-command key'))));
+  }
 
-    // The two mappings are mutually exclusive; enabling one clears the other.
-    final mapCmdOption = 'map_command_to_ctrl';
-    final mapCmdValue = bind.sessionGetToggleOptionSync(
-        sessionId: sessionId, arg: mapCmdOption);
-    onMapCmdChanged(bool? value) {
+  // map command to ctrl, macOS only; mutually exclusive with the swap above
+  if (ffiModel.keyboard && isMacOS && pi.platform != kPeerPlatformMacOS) {
+    final option = 'map_command_to_ctrl';
+    final value =
+        bind.sessionGetToggleOptionSync(sessionId: sessionId, arg: option);
+    onChanged(bool? value) {
       if (value == null) return;
-      bind.sessionToggleOption(sessionId: sessionId, value: mapCmdOption);
+      bind.sessionToggleOption(sessionId: sessionId, value: option);
     }
 
+    final enabled = !ffi.ffiModel.viewOnly;
     v.add(TToggleMenu(
-        value: mapCmdValue,
-        onChanged: enabled ? onMapCmdChanged : null,
+        value: value,
+        onChanged: enabled ? onChanged : null,
         child: Text(translate('Map command to Ctrl'))));
   }
 
